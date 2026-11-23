@@ -262,7 +262,11 @@ impl WinitState {
             self.window_compositor_updates[pos].scale_changed = true;
         } else if let Some(pointer) = self.pointer_surfaces.get(&surface.id()) {
             // Get the window, where the pointer resides right now.
-            let focused_window = match pointer.pointer().winit_data().focused_window() {
+            let focused_window = match pointer
+                .pointer()
+                .data::<WinitPointerData>()
+                .and_then(|data| data.focused_window())
+            {
                 Some(focused_window) => focused_window,
                 None => return,
             };

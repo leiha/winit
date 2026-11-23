@@ -229,8 +229,10 @@ impl WindowState {
         mut callback: F,
     ) {
         self.pointers.iter().filter_map(Weak::upgrade).for_each(|pointer| {
-            let data = pointer.pointer().winit_data();
-            callback(pointer.as_ref(), data);
+            // A seat that lost its pointer released it: the data of a released pointer is gone.
+            if let Some(data) = pointer.pointer().data::<WinitPointerData>() {
+                callback(pointer.as_ref(), data);
+            }
         })
     }
 
@@ -799,11 +801,13 @@ impl WindowState {
             }
             surface.commit();
 
-            let serial = pointer
+            let Some(serial) = pointer
                 .pointer()
                 .data::<WinitPointerData>()
                 .and_then(|data| data.pointer_data().latest_enter_serial())
-                .unwrap();
+            else {
+                return;
+            };
 
             let hotspot =
                 PhysicalPosition::new(cursor.hotspot_x, cursor.hotspot_y).to_logical(scale);
@@ -971,7 +975,9 @@ impl WindowState {
             }
         } else {
             for pointer in self.pointers.iter().filter_map(|pointer| pointer.upgrade()) {
-                let latest_enter_serial = pointer.pointer().winit_data().latest_enter_serial();
+                // A released pointer has no data left: nothing to hide on it.
+                let Some(data) = pointer.pointer().data::<WinitPointerData>() else { continue };
+                let latest_enter_serial = data.latest_enter_serial();
 
                 pointer.pointer().set_cursor(latest_enter_serial, None, 0, 0);
             }
